@@ -7,9 +7,7 @@ from task1a_steady_aquifer import (
     solve_case, face_darcy_flux, pick_resolution, stamp_figure,
 )
 
-# ==========================================================================
-# PARAMS  (PHI, D, B, C_INJ, C_BC, T_END, SAFETY as in Task 1b)
-# ==========================================================================
+# PARAMS
 PHI = 0.25
 D = 1.0e-8
 B = 5.0
@@ -20,13 +18,14 @@ SECONDS_PER_DAY = 86400.
 T_END = 100. * SECONDS_PER_DAY
 SAFETY = 0.9
 
-# NEW: reaction parameters (Eq. 4-7)
+# New reaction parameters 
 Y = 0.05            # kg Cu dissolved per kg lixiviant reacted
-KR = 1.0e-7          # /s, leaching reaction rate constant
+KR = 1.0e-7         # /s, leaching reaction rate constant
 
-# ==========================================================================
-# GRID + STEADY FLOW FIELD (Task 1a, same resolution, held fixed)
-# ==========================================================================
+
+# GRID + STEADY FLOW FIELD 
+# Task 1a, same resolution, held fixed
+
 NX = pick_resolution(160)
 NY = NX
 x, y, dx, dy, h, t_solve, well_idx = solve_case(NX, NY)
@@ -35,10 +34,7 @@ x_flux, y_flux = face_darcy_flux(h, dx, dy)
 inj_name, inj_i, inj_j, _ = [w for w in well_idx if w[3] > 0][0]
 ext_wells = [w for w in well_idx if w[3] < 0]
 
-# ==========================================================================
-# STABILITY: same boundedness approach as Task 1b, with an extra domain-
-# wide sink from the leaching reaction (-kr*C in the lixiviant equation).
-# ==========================================================================
+# STABILITY
 De_face = np.full((NX + 1, NY), PHI * D * dy / dx)
 De_face[0, :] *= 2.; De_face[-1, :] *= 2.
 Dn_face = np.full((NX, NY + 1), PHI * D * dx / dy)
@@ -55,10 +51,8 @@ sum_nb = aE + aW + aN + aS
 
 sp_extra = np.zeros((NX, NY))
 for name, i, j, Q in ext_wells:
-    sp_extra[i, j] += QE / B          # extraction sink (both species)
-sp_extra += KR * dx * dy               # reaction sink, EVERYWHERE (lixiviant only,
-                                        # but used here as the shared/binding limit
-                                        # since C and C_Cu are marched with one dt)
+    sp_extra[i, j] += QE / B         
+sp_extra += KR * dx * dy      
 
 dt_bound = PHI * dx * dy / (sum_nb + sp_extra)
 dt = SAFETY * dt_bound.min()
@@ -71,14 +65,7 @@ print(f"Using dt = {dt:.1f} s -> {nsteps} steps to reach {T_END/SECONDS_PER_DAY:
 
 
 def flux_divergence(Cfield):
-    """
-    Net face-flux divergence term, dy*(Fx_e-Fx_w) + dx*(Fy_n-Fy_s), for a
-    generic scalar Cfield being advected by the steady flow field
-    (x_flux, y_flux) and diffused with coefficient PHI*D. Upwind for
-    convection, central difference for diffusion - identical scheme to
-    Task 1b, just factored out here since it is now needed for TWO
-    species (lixiviant and copper) each step.
-    """
+
     Cx = np.zeros((NX + 1, NY))
     Cy = np.zeros((NX, NY + 1))
 
@@ -99,17 +86,13 @@ def flux_divergence(Cfield):
     return dy * (Cx[1:, :] - Cx[:-1, :]) + dx * (Cy[:, 1:] - Cy[:, :-1])
 
 
-# ==========================================================================
 # WELL SOURCE TERMS
-#   lixiviant:  R_well   = +QI*C_inj/(B*dx*dy) injector, -QE*C/(B*dx*dy) extractors
-#   copper:     R_well,Cu = 0 at injector (injected fluid carries no copper),
-#                           -QE*C_Cu/(B*dx*dy) at extractors
-# ==========================================================================
+
 R_inj = QI * C_INJ / (B * dx * dy)
 
-# ==========================================================================
+
 # TIME MARCHING
-# ==========================================================================
+
 C = np.zeros((NX, NY))       # lixiviant concentration
 CCu = np.zeros((NX, NY))     # copper concentration
 
@@ -155,9 +138,7 @@ print("\nConcentration at each extraction well after 100 days:")
 for name, i, j, Q in ext_wells:
     print(f"  {name}: C = {C[i, j]:.4f} kg/m3   C_Cu = {CCu[i, j]:.5f} kg/m3")
 
-# ==========================================================================
 # PLOTS
-# ==========================================================================
 OUT = "outputs"
 time_history = np.array(time_history) / SECONDS_PER_DAY
 
