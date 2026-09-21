@@ -1,3 +1,4 @@
+import os
 import time
 import subprocess
 from datetime import datetime
@@ -7,19 +8,19 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 import matplotlib.pyplot as plt
 
-# ==========================================================================
-# PARAMS   (Table 1 of the assignment)
-# ==========================================================================
-LX = 1000.          # m
-LY = 1000.          # m
+
+# PARAMS 
+
+LX = 1000.           # m
+LY = 1000.           # m
 H_BC = 100.          # m, Dirichlet head on all four edges
 
 K = 2.0e-6          # m/s, hydraulic conductivity
 B = 5.0             # m, aquifer thickness
 T = K * B           # m2/s, transmissivity
 
-QI = 0.02            # m3/s, injection rate
-QE = QI / 4.0         # m3/s, extraction rate (per well)
+QI = 0.02           # m3/s, injection rate
+QE = QI / 4.0       # m3/s, extraction rate (per well)
 
 # wells: name, x, y, Q   (+ve Q = injection, -ve Q = extraction)
 WELLS = [
@@ -31,28 +32,11 @@ WELLS = [
 ]
 
 
-# ==========================================================================
-# GRID + CREATE MATRIX + SOLVE, all wrapped in one function so the
-# convergence study below can call it once per resolution.
-# ==========================================================================
-def solve_case(NX, NY):
-    """
-    Assemble and solve the steady-state FVM system for hydraulic head
-    on an NX x NY grid.
+# GRID + CREATE MATRIX + SOLVE,
+# wrap these into one fucntion for convergence study 
 
-    This follows the same matrix set-up we used for 2D unsteady
-    diffusion (wk5_2d_unsteady.py: id(), A, b, EAST/WEST/NORTH/SOUTH
-    loop), with three differences:
-      1. No unsteady term - this problem is steady-state, so there is
-         no rho*dx*dy/dt contribution to aP, and no b[idx] += ...*T_old.
-      2. Well source terms are added after the main loop.
-      3. A is assembled SPARSE and solved with a sparse solver, not
-         np.linalg.inv(), because the convergence study needs grids up
-         to 241 x 241 (~58,000 unknowns) - a dense 58,000 x 58,000
-         array would need ~27 TB, and its inverse is not something we
-         actually need here anyway (unlike the unsteady case, we only
-         solve this system ONCE, so pre-inverting buys us nothing).
-    """
+def solve_case(NX, NY):
+
     dx = LX / NX
     dy = LY / NY
     x = np.linspace(dx / 2., LX - dx / 2., NX)
@@ -71,7 +55,6 @@ def solve_case(NX, NY):
     # CREATE MATRIX
     def id(i, j):
         return i * NY + j
-
     N = NX * NY
     A = sp.lil_matrix((N, N))
     b = np.zeros(N)
@@ -125,19 +108,9 @@ def solve_case(NX, NY):
 
     return x, y, dx, dy, h, (toc - tic), well_idx
 
-
-# ==========================================================================
 # DARCY FLUX
-# ==========================================================================
+
 def face_darcy_flux(h, dx, dy):
-    """
-    Darcy flux q = -K grad(h) evaluated AT CELL FACES (not yet averaged
-    to centres). x_flux has shape (NX+1, NY): x_flux[i,:] is the WEST
-    face of cell i (and the EAST face of cell i-1); x_flux[0,:] and
-    x_flux[-1,:] are the domain boundary faces. Same convention as
-    w4_2d_unsteady.py. Task 1b reuses these face values directly for its
-    upwind convection scheme.
-    """
     NX, NY = h.shape
     x_flux = np.zeros((NX + 1, NY))
     y_flux = np.zeros((NX, NY + 1))
@@ -162,14 +135,12 @@ def darcy_flux(h, dx, dy):
     return qx, qy, qmag
 
 
-# ==========================================================================
-# Plot stamping (date + git hash, per submission requirements)
-# ==========================================================================
+# Plot stamping
 def stamp_figure(fig):
     try:
         git_hash = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL, cwd="/home/claude/mech6480_a1",
+            stderr=subprocess.DEVNULL, cwd=os.path.dirname(os.path.abspath(__file__)),
         ).decode().strip()
     except Exception:
         git_hash = "no-git"
@@ -196,10 +167,10 @@ def pick_resolution(target):
 
 if __name__ == "__main__":
     OUT = "outputs"
+    os.makedirs(OUT, exist_ok=True)
 
-    # ----------------------------------------------------------------
+
     # GRID CONVERGENCE STUDY
-    # ----------------------------------------------------------------
     targets = [20, 40, 80, 120, 160, 200, 240]
     resolutions = [pick_resolution(t) for t in targets]
 
@@ -283,9 +254,9 @@ if __name__ == "__main__":
         vals = ", ".join(f"{name}={r['h'][i, j]:.1f}" for name, i, j, Q in r["well_idx"])
         print(f"  NX={r['NX']:4d}: {vals}")
 
-    # ----------------------------------------------------------------
+
     # SELECTED RESOLUTION: contour plots of head and Darcy flux
-    # ----------------------------------------------------------------
+
     NX_SEL = pick_resolution(160)     # see write-up for justification
     sel = [r for r in runs if r["NX"] == NX_SEL][0]
     h, qx, qy, qmag = sel["h"], sel["qx"], sel["qy"], sel["qmag"]
