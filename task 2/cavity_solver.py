@@ -3,9 +3,7 @@ from datetime import datetime
 
 import numpy as np
 
-# ==========================================================================
-# PARAMS  (problem statement, Part 2)
-# ==========================================================================
+# PARAMS
 L = 0.1          # m, cavity width
 H = 0.1          # m, cavity height
 RHO = 1000.0     # kg/m3
@@ -21,28 +19,10 @@ def nu_from_Re(Re):
     return U_LID * L / Re
 
 
-# ==========================================================================
+
 # PROJECTION-METHOD SOLVER
-#   Follows the algorithm in the assignment appendix (Eqs 9-13): predict a
-#   non-divergence-free u* from the momentum equation (ignoring pressure),
-#   solve a pressure Poisson equation so that correcting u* by -dt/rho*grad(p)
-#   gives a divergence-free field, then apply that correction.
-#
-#   Staggered (MAC) grid, matching the class demo's array/indexing
-#   convention:
-#     u : shape (NX+1, NY+2)  x-velocity on vertical cell faces,
-#                              +1 ghost row top and bottom
-#     v : shape (NX+2, NY+1)  y-velocity on horizontal cell faces,
-#                              +1 ghost column left and right
-#     p : shape (NX+2, NY+2)  cell centres, +1 ghost layer all round
-# ==========================================================================
 def solve_cavity(Re, NX, NY, dt, n_steps, brinkman_k=None,
                   check_every=200, tol_steady=1.0e-5, verbose=True):
-    """
-    Solve lid-driven cavity flow (or the Brinkman-modified porous cavity,
-    if brinkman_k is given) up to n_steps timesteps, stopping early once
-    the field stops changing (see tol_steady).
-    """
     nu = nu_from_Re(Re)
     dx = L / NX
     dy = H / NY
@@ -64,13 +44,7 @@ def solve_cavity(Re, NX, NY, dt, n_steps, brinkman_k=None,
     vt = np.zeros_like(v)
     p_next = np.zeros_like(p)
 
-    # BOUNDARY CONDITIONS -------------------------------------------------
-    # No-slip on left/right/bottom walls, moving lid (u=U_LID, v=0) on top.
-    # Dirichlet components that sit exactly ON a u- or v-node are set
-    # directly; components that fall BETWEEN a ghost row/column and the
-    # first interior row/column are enforced by mirroring the ghost value
-    # (ghost = 2*wall_value - interior), the same "ghost cell" convention
-    # used for the boundary conductances in Task 1.
+    # BOUNDARY CONDITIONS
     def apply_u_bc(uf):
         uf[0, :] = 0.0                      # left wall (u exactly on node)
         uf[-1, :] = 0.0                     # right wall
@@ -84,8 +58,8 @@ def solve_cavity(Re, NX, NY, dt, n_steps, brinkman_k=None,
         vf[-1, :] = -vf[-2, :]              # right wall, v=0 -> mirror
 
     def apply_p_bc(pf):
-        # Homogeneous Neumann (zero normal gradient) on all four walls -
-        # no flow through any wall, so no pressure gradient normal to it.
+        # Homogeneous Neumann (zero normal gradient) on all four walls
+        # no flow through any wall, so no pressure gradient normal to it
         pf[0, :] = pf[1, :]
         pf[-1, :] = pf[-2, :]
         pf[:, 0] = pf[:, 1]
@@ -103,7 +77,6 @@ def solve_cavity(Re, NX, NY, dt, n_steps, brinkman_k=None,
 
     for step in range(n_steps):
         # 1. PREDICT u*, v* : convective + diffusive flux, momentum eqn
-        #    (pressure omitted - this is Eq. 11 of the appendix)
         J_u_x[:, :] = 0.25 * (u[:-1, 1:-1] + u[1:, 1:-1])**2 \
             - nu * (u[1:, 1:-1] - u[:-1, 1:-1]) / dx
         J_u_y[:, :] = 0.25 * (u[1:-1, 1:] + u[1:-1, :-1]) * (v[1:-2, :] + v[2:-1, :]) \
@@ -127,7 +100,7 @@ def solve_cavity(Re, NX, NY, dt, n_steps, brinkman_k=None,
         apply_u_bc(ut)
         apply_v_bc(vt)
 
-        # 2. PRESSURE POISSON: lap(p) = rho/dt * div(u*)   (Eq. 12)
+        # 2. PRESSURE POISSON: lap(p) = rho/dt * div(u*)
         divergence = (ut[1:, 1:-1] - ut[:-1, 1:-1]) / dx + \
                      (vt[1:-1, 1:] - vt[1:-1, :-1]) / dy
         rhs = RHO / dt * divergence

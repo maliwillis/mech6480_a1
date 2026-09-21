@@ -10,25 +10,10 @@ from task2a_lid_cavity import load_ref_u, load_ref_v
 REFDATA = "refdata"
 OUT = "outputs"
 
-# ==========================================================================
-# Brinkman-modified momentum equation (Eq. 8):
-#   du/dt + div(uu) = -1/rho grad(p) + nu*lap(u) - (nu/k)*u
-#
-# The extra term is a LINEAR DRAG proportional to local velocity, applied
-# during the velocity-prediction step in cavity_solver.solve_cavity()
-# (before the pressure projection - it is just another explicit source
-# term alongside the convective/diffusive flux divergence):
-#
-#     if brinkman_k is not None:
-#         ut[1:-1, 1:-1] -= dt * (nu / brinkman_k) * u[1:-1, 1:-1]
-#         vt[1:-1, 1:-1] -= dt * (nu / brinkman_k) * v[1:-1, 1:-1]
-#
-# No other part of the projection method changes: u* still gets corrected
-# by the same pressure-Poisson / velocity-correction steps.
-# ==========================================================================
+# INPUTS
 K_PERM = 5.0e-5   # m^2, permeability
 RE = 1000
-NX_SEL = 61        # same resolution justified/selected in Task 2a
+NX_SEL = 61       # same resolution justified/selected in Task 2a
 
 
 def run_case():

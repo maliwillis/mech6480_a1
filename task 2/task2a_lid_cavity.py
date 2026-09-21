@@ -10,12 +10,7 @@ from cavity_solver import (
 REFDATA = "refdata"
 OUT = "outputs"
 
-# ==========================================================================
-# REFERENCE DATA (Ghia-style benchmark, provided with the assignment)
-#   ux file columns: y, x05, x10, x50, x90, x95  (u at x = that fraction*L)
-#   uy file columns: x, y05, y10, y50, y90, y99  (v at y = that fraction*H)
-#   x, y columns are normalised 0-1; we want the x=0.5L / y=0.5H columns.
-# ==========================================================================
+# LOAD REF DATA (given)
 def load_ref_u(Re):
     data = np.loadtxt(f"{REFDATA}/lid_cavity_data_ux_re{Re}.txt", skiprows=1)
     return data[:, 0], data[:, 3]     # y/H,  u at x=L/2
@@ -26,12 +21,8 @@ def load_ref_v(Re):
     return data[:, 0], data[:, 3]     # x/L,  v at y=H/2
 
 
-# ==========================================================================
+
 # GRID / TIMESTEP SENSITIVITY  (Re = 1000)
-#   dt is set as a fixed fraction of dx (CFL-based); this was checked to sit
-#   comfortably below both the convective (dt < dx/U_lid) and diffusive
-#   (dt < dx^2/4nu) explicit stability limits for every case run here.
-# ==========================================================================
 def run_sensitivity():
     print("=== Grid sensitivity (Re = 1000) ===")
     resolutions = [21, 31, 41, 51, 61]
@@ -78,9 +69,10 @@ def run_sensitivity():
     return runs
 
 
-# ==========================================================================
-# FULL RUN AT SELECTED RESOLUTION, FOR ONE Re
-# ==========================================================================
+
+# FULL RUN AT SELECTED RESOLUTION
+# for one Re
+
 def run_case(Re, NX):
     dx = L / NX
     dt = 0.2 * dx
