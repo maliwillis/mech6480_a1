@@ -7,24 +7,22 @@ from task1a_steady_aquifer import (
     solve_case, face_darcy_flux, pick_resolution, stamp_figure,
 )
 
-# ==========================================================================
+
 # PARAMS
-# ==========================================================================
 PHI = 0.25            # porosity
 D = 1.0e-8            # m2/s, lixiviant diffusion coefficient
-B = 5.0                # m, aquifer thickness
-C_INJ = 5.0            # kg/m3, injected lixiviant concentration
-C_BC = 0.0             # kg/m3, far-field concentration (Dirichlet)
+B = 5.0               # m, aquifer thickness
+C_INJ = 5.0           # kg/m3, injected lixiviant concentration
+C_BC = 0.0            # kg/m3, far-field concentration (Dirichlet)
 
 SECONDS_PER_DAY = 86400.
 T_END = 100. * SECONDS_PER_DAY   # 100 days
 
 SAFETY = 0.9            # fraction of the explicit stability limit to use
 
-# ==========================================================================
-# GRID + STEADY FLOW FIELD (Task 1a, same resolution, held fixed)
-# ==========================================================================
-NX = pick_resolution(160)      # SAME resolution selected in Task 1a
+
+# GRID + STEADY FLOW FIELD (From Task 1a -> NX = 161
+NX = pick_resolution(160)
 NY = NX
 x, y, dx, dy, h, t_solve, well_idx = solve_case(NX, NY)
 x_flux, y_flux = face_darcy_flux(h, dx, dy)     # steady Darcy flux at faces
@@ -34,12 +32,8 @@ print(f"Darcy flux magnitude range: "
       f"[{np.sqrt(0.5*(x_flux[:-1]**2+x_flux[1:]**2)).min():.2e}, "
       f"{np.max(np.abs(x_flux)):.2e}] m/s (x-faces, similar for y)")
 
-# ==========================================================================
+
 # STABILITY: choose dt from the explicit boundedness criterion
-# ==========================================================================
-# Face conductances/coefficients, using the same East/West/North/South
-# face-array convention as the diffusion demos (x_flux[i] = west face of
-# cell i, x_flux[i+1] = east face of cell i).
 De_face = np.full((NX + 1, NY), PHI * D * dy / dx)
 De_face[0, :] *= 2.; De_face[-1, :] *= 2.        # boundary: half distance
 Dn_face = np.full((NX, NY + 1), PHI * D * dx / dy)
@@ -48,23 +42,12 @@ Dn_face[:, 0] *= 2.; Dn_face[:, -1] *= 2.
 Fe_face = x_flux * dy      # convective face coefficient (m^2/s), "F" in Patankar notation
 Fn_face = y_flux * dx
 
-# Per-cell neighbour coefficients for an UPWIND convection + central
-# diffusion scheme (matches the WKS "upwind convection-diffusion" slide,
-# aE = De + max(-Fe,0), aW = Dw + max(Fw,0), etc.)
+# Per-cell neighbour coefficients for an upwind convection + central
 aE = De_face[1:, :] + np.maximum(-Fe_face[1:, :], 0.)
 aW = De_face[:-1, :] + np.maximum(Fe_face[:-1, :], 0.)
 aN = Dn_face[:, 1:] + np.maximum(-Fn_face[:, 1:], 0.)
 aS = Dn_face[:, :-1] + np.maximum(Fn_face[:, :-1], 0.)
 
-# Explicit boundedness requires a_P^0 = PHI*dx*dy/dt > (aE+aW+aN+aS) - Sp
-# (same logic as the "Setting theta=0: Explicit scheme" slide, generalised
-# from pure diffusion to convection-diffusion). The extraction wells add a
-# LINEAR SINK, R_well = -QE*C/(B*dx*dy), which contributes an extra
-# negative Sp = -QE/(B*dx*dy) at those cells - i.e. it makes the required
-# aP0 (and hence the allowable dt) SMALLER there. In flux-conductance
-# units (m^2/s, matching aE/aW/aN/aS above) this extra term is QE/B.
-# Missing this term is a classic way to get an "explicit sink" instability
-# even when the convection/diffusion part alone looks stable.
 sum_nb = aE + aW + aN + aS
 sp_extra = np.zeros((NX, NY))
 for name, i, j, Q in [w for w in well_idx if w[3] < 0]:
@@ -79,19 +62,13 @@ print(f"Explicit stability limit dt_max = {dt_bound.min():.1f} s "
       f"(tightest cell, safety factor {SAFETY})")
 print(f"Using dt = {dt:.1f} s -> {nsteps} steps to reach {T_END/SECONDS_PER_DAY:.0f} days")
 
-# ==========================================================================
 # WELL SOURCE TERMS
-# R_well = +QI*C_inj / (B*dx*dy)   in the injector cell (constant)
-#          -QE*C     / (B*dx*dy)   in each extractor cell (depends on C)
-# ==========================================================================
 inj_name, inj_i, inj_j, _ = [w for w in well_idx if w[3] > 0][0]
 ext_wells = [w for w in well_idx if w[3] < 0]     # (name, i, j, Q)
 
 R_inj = QI * C_INJ / (B * dx * dy)     # constant, added every step
 
-# ==========================================================================
 # TIME MARCHING (explicit, upwind convection + central diffusion)
-# ==========================================================================
 C = np.zeros((NX, NY))          # initial condition: C = 0 everywhere
 
 snapshot_days = [0, 20, 40, 60, 80, 100]
@@ -102,9 +79,8 @@ time_history = []
 tic = time.time()
 sim_time = 0.0
 for step in range(nsteps):
-    # CONVECTIVE + DIFFUSIVE FACE FLUX (combined, upwind for convection,
-    # central difference for diffusion - same x_flux/y_flux array style
-    # as the diffusion demos, now carrying an extra advective term)
+    # CONVECTIVE + DIFFUSIVE FACE FLUX 
+    # combined, upwind for convection, central difference for diffusion
     Cx_flux = np.zeros((NX + 1, NY))
     Cy_flux = np.zeros((NX, NY + 1))
 
@@ -159,9 +135,7 @@ print("\nLixiviant concentration at each extraction well after 100 days:")
 for name, i, j, Q in ext_wells:
     print(f"  {name}: C = {C[i, j]:.4f} kg/m3")
 
-# ==========================================================================
 # PLOTS
-# ==========================================================================
 OUT = "outputs"
 time_history = np.array(time_history) / SECONDS_PER_DAY
 
